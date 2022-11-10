@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+import os
+
+os.environ.setdefault( 'DJANGO_SETTINGS_MODULE', 'factory.settings' )
+
+import django
+django.setup()
+
+import sys
+import argparse
+import subprocess
+import getpass
+
+from collections import OrderedDict
+from django.apps import apps
+from django.conf import settings
+from django.contrib.auth.models import User, Group, Permission
+from django.core.exceptions import ValidationError
+
+
+def lookup_permission_list( permission_list ):
+  result = []
+  for permission in permission_list:
+    app_label, codename = permission.split( '.' )
+    try:
+      result.append( Permission.objects.get( codename=codename, content_type__app_label=app_label ) )
+    except Permission.DoesNotExist:
+      print( 'Error looking up permission "{0}"'.format( permission ) )
+      sys.exit( 1 )
+
+  return result
+
+
+parser = argparse.ArgumentParser( description='Factory Setup Wizard, must be run as root' )
+parser.add_argument( '--superuser-username', help='username for the superuser, default=root', default='root' )
+parser.add_argument( '--superuser-password', help='password to use for the superuser user, if not specified it will be prompted for' )
+
+args = parser.parse_args()
+
+#if not manual_loaded and os.getuid() != 0:
+#  print( 'setupWizard was not run as root, and the required manual plugin not loaded.' )
+#  sys.exit( 1 )
+
+if args.superuser_password:
+  superuser_password = args.superuser_password
+else:
+  print( 'Please Specify the password to use for the superuser("{0}") user'.format( args.superuser_username) )
+  superuser_password = getpass.getpass()
+
+print( '* Creating superuser("{0}") user...'.format( args.superuser_username ) )
+User.objects.create_superuser( username=args.superuser_username, password=superuser_password, email='{0}@{1}'.format( args.superuser_username, args.site_domain ) )
+
+print( '* Create assembler user...' )
+user = User.objects.create_user( username='assembler', password='assembler', email='assembler@factory' )
+user.user_permissions.set( lookup_permission_list( [
+                                                     ] ) )
+
+print( '* Creating groups...' )
+
+
+print( 'Done!' )
