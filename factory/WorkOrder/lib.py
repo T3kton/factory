@@ -24,23 +24,23 @@ def _connect():
   return _mongo_db
 
 
-def get_part_list( query, max_reults ):
+def get_part_list( query, max_results ):
   if not query:
     return []
 
   db = _connect()
-  part_list = db.find( filter=query, limit=max_reults )
+  part_list = list( db.find( filter=query, limit=max_results ) )
   return part_list
 
 
 class WorkOrderPlugin( object ):
-  TSCRIPT_NAME = 'workorder'
+  SCRIPT_NAME = 'workorder'
 
   def __init__( self, workorder ):
     super().__init__()
-    if isinstance( workorder, str ):
+    if isinstance( workorder, int ):
       self.workorder_pk = workorder
-      self.workorder = WorkOrder.objects.get( pk=self.workorder )
+      self.workorder = WorkOrder.objects.get( pk=self.workorder_pk )
 
     else:
       self.workorder = workorder
@@ -58,20 +58,18 @@ class WorkOrderPlugin( object ):
     return result
 
   def __reduce__( self ):
-    return ( self.__class__, ( ( self.target_class, self.target_pk ), ) )
+    return ( self.__class__, ( self.workorder_pk, ) )
 
 
 class PartPlugin( object ):
-  TSCRIPT_NAME = 'part'
+  SCRIPT_NAME = 'part'
 
   def __init__( self, part ):
     super().__init__()
-    self.part = part
+    self.values = part.copy()  # need to deepcopy?
 
   def getValues( self ):
-    result = {}
-    result[ 'key' ] = 'value'
-    return result
+    return self.values.copy()
 
   def getFunctions( self ):
     result = {}
@@ -79,34 +77,35 @@ class PartPlugin( object ):
     return result
 
   def __reduce__( self ):
-    return ( self.__class__, ( self.part, ) )
+    return ( self.__class__, ( self.values, ) )
 
 
-def _createJob( workorder, part=None ):
-  runner = Runner( Parser.parse( workorder.script ) )
+def _createJob( workorder, part ):
+  parser = Parser()
+  runner = Runner( parser.parse( workorder.script ) )
 
   # for module in RUNNER_MODULE_LIST:
   #   runner.registerModule( module )
 
-  for module in ( 'factory.WorkOrder.runner_plugins.tbd', ):
-    runner.registerModule( module )
+  # for module in ( 'factory.WorkOrder.runner_plugins', ):
+  #   runner.registerModule( module )
 
   runner.registerObject( PartPlugin( part ) )
   runner.registerObject( WorkOrderPlugin( workorder ) )
 
-  job = Job( workorder=workorder, part=part )
-  job.state = 'waiting'
+  job = Job( workorder=workorder, part=part[ '_id' ] )
+  job.state = 'new'
   job.script_runner = pickle.dumps( runner )
   job.full_clean()
   job.save()
 
 
-def processJobs( site, module_list, max_jobs=10 ):
+def processJobs( module_list, max_jobs=10 ):
   if max_jobs > 100:
     max_jobs = 100
 
   # start waiting jobs
-  for job in Job.objects.select_for_update().filter( site=site, state='waiting' ):
+  for job in Job.objects.select_for_update().filter( state='waiting' ):
     job.state = 'queued'
     job.started_at = timezone.now()
     job.full_clean()
@@ -115,10 +114,7 @@ def processJobs( site, module_list, max_jobs=10 ):
     # JobLog.started( job )
 
   # clean up completed jobs
-  for job in Job.objects.select_for_update().filter( site=site, state='done' ):
-    workorder = job.workorder.select_for_update()
-    workorder.results[ job.part ] = 'Done with message: {0}'.format( job.message )
-
+  for job in Job.objects.select_for_update().filter( state='done' ):
     job.finished_at = timezone.now()
     job.full_clean()
     job.save()
@@ -127,7 +123,7 @@ def processJobs( site, module_list, max_jobs=10 ):
 
   # iterate over the curent jobs
   results = []
-  for job in Job.objects.select_for_update().filter( site=site, state='queued' ).order_by( 'updated' ):
+  for job in Job.objects.select_for_update().filter( state='queued' ).order_by( 'updated' ):
     runner = pickle.loads( job.script_runner )
 
     if runner.aborted:

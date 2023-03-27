@@ -17,7 +17,6 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=200, primary_key=True, serialize=False)),
                 ('description', models.CharField(max_length=250)),
                 ('part_query', models.CharField(blank=True, max_length=500)),
-                ('allow_query_in_execute', models.BooleanField(default=False)),
                 ('script', models.TextField()),
                 ('updated', models.DateTimeField(auto_now=True)),
                 ('created', models.DateTimeField(auto_now_add=True)),

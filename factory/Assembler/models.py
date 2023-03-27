@@ -5,8 +5,7 @@ from factory.WorkOrder.lib import processJobs, jobResults, jobError
 cinp = CInP( 'Assembler', '0.1' )
 
 
-# these are only for subcontractor to talk to, thus some of the job_id short cuts
-@cinp.staticModel()  # TODO: move to  Foreman?
+@cinp.staticModel()
 class Assembler():
   def __init__( self ):
     super().__init__()

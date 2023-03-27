@@ -29,7 +29,6 @@ class Drawing( models.Model ):
   name = models.CharField( max_length=200, primary_key=True )
   description = models.CharField( max_length=250 )
   part_query = models.CharField( max_length=500, blank=True )
-  allow_query_in_execute = models.BooleanField( default=False )
   script = models.TextField()
   updated = models.DateTimeField( editable=False, auto_now=True )
   created = models.DateTimeField( editable=False, auto_now_add=True )
