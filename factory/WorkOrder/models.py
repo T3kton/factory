@@ -172,6 +172,7 @@ class Job( models.Model ):
   workorder = models.ForeignKey( WorkOrder, on_delete=models.PROTECT )
   part = models.CharField( max_length=200, blank=True, null=True )
   state = models.CharField( max_length=10, choices=[ ( i, i ) for i in JOB_STATE_CHOICES ] )
+  values = MapField()
   status = JSONField( default=[], blank=True )
   message = models.CharField( max_length=1024, default='', blank=True )
   script_runner = models.BinaryField( editable=False )
@@ -365,4 +366,4 @@ class Job( models.Model ):
                   )
 
   def __str__( self ):
-    return 'Job #{0} in "{1}"'.format( self.pk, self.site.pk )
+    return 'Job #{0} for "{1}"'.format( self.pk, self.workorder.pk )

@@ -9,5 +9,7 @@ htmlcov
 .coveragerc
 .cache
 
-factory/plugins
 factory/settings.py
+
+factory/plugins
+!factory/plugins/

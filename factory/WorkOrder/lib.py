@@ -1,4 +1,5 @@
 import pickle
+import copy
 
 from pymongo import MongoClient
 from django.utils import timezone
@@ -64,12 +65,17 @@ class WorkOrderPlugin( object ):
 class PartPlugin( object ):
   SCRIPT_NAME = 'part'
 
-  def __init__( self, part ):
+  def __init__( self, part, values ):
     super().__init__()
-    self.values = part.copy()  # need to deepcopy?
+    self.part = part
+    self.values = copy.deepcopy( values.copy() )
 
   def getValues( self ):
-    return self.values.copy()
+    result = {}
+    result[ 'part' ] = self.part
+    result[ 'values' ] = self.values
+
+    return result
 
   def getFunctions( self ):
     result = {}
@@ -77,10 +83,10 @@ class PartPlugin( object ):
     return result
 
   def __reduce__( self ):
-    return ( self.__class__, ( self.values, ) )
+    return ( self.__class__, ( self.part, self.values ) )
 
 
-def _createJob( workorder, part ):
+def _createJob( workorder, part, value_map ):
   parser = Parser()
   runner = Runner( parser.parse( workorder.script ) )
 
@@ -93,7 +99,7 @@ def _createJob( workorder, part ):
   runner.registerObject( PartPlugin( part ) )
   runner.registerObject( WorkOrderPlugin( workorder ) )
 
-  job = Job( workorder=workorder, part=part[ '_id' ] )
+  job = Job( workorder=workorder, part=part[ '_id' ], values=value_map )
   job.state = 'new'
   job.script_runner = pickle.dumps( runner )
   job.full_clean()
