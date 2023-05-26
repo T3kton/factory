@@ -8,8 +8,10 @@ from django.conf import settings
 from factory.script.parser import Parser
 from factory.script.runner import Runner, Pause, ExecutionError, UnrecoverableError, ParamaterError, NotDefinedError, ScriptError
 
-
 from factory.WorkOrder.models import WorkOrder, Job, WorkOrderException
+
+
+RUNNER_MODULE_LIST = []
 
 MAX_PART_LIST_SIZE = 100
 
@@ -49,7 +51,7 @@ class WorkOrderPlugin( object ):
 
   def getValues( self ):
     result = {}
-    result[ 'options' ] = self.workorder.options
+    result[ 'options' ] = ( lambda: self.workorder.options, None )
 
     return result
 
@@ -65,15 +67,19 @@ class WorkOrderPlugin( object ):
 class PartPlugin( object ):
   SCRIPT_NAME = 'part'
 
-  def __init__( self, part, values ):
+  def __init__( self, part, values=None ):
     super().__init__()
-    self.part = part
-    self.values = copy.deepcopy( values.copy() )
+    if isinstance( part, dict ):
+      self.part = part[ '_id' ]
+      self.values = copy.deepcopy( part )
+    else:
+      self.part = part
+      self.values = values
 
   def getValues( self ):
     result = {}
-    result[ 'part' ] = self.part
-    result[ 'values' ] = self.values
+    result[ 'part' ] = ( lambda: self.part, None )
+    result[ 'values' ] = (lambda: self.values, None )
 
     return result
 
@@ -86,20 +92,17 @@ class PartPlugin( object ):
     return ( self.__class__, ( self.part, self.values ) )
 
 
-def _createJob( workorder, part, value_map ):
+def _createJob( workorder, part ):
   parser = Parser()
   runner = Runner( parser.parse( workorder.script ) )
 
-  # for module in RUNNER_MODULE_LIST:
-  #   runner.registerModule( module )
-
-  # for module in ( 'factory.WorkOrder.runner_plugins', ):
-  #   runner.registerModule( module )
+  for module in RUNNER_MODULE_LIST:
+    runner.registerModule( module )
 
   runner.registerObject( PartPlugin( part ) )
   runner.registerObject( WorkOrderPlugin( workorder ) )
 
-  job = Job( workorder=workorder, part=part[ '_id' ], values=value_map )
+  job = Job( workorder=workorder, part=part[ '_id' ], values=part )
   job.state = 'new'
   job.script_runner = pickle.dumps( runner )
   job.full_clean()

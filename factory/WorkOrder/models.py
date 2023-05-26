@@ -140,7 +140,7 @@ class WorkOrder( models.Model ):
   def getResults( self ):
     results = {}
     for job in self.job_set.all():
-      results[ job.part ] = '({0}{1})'.format( job.state, job.message )
+      results[ job.part ] = '{0}: {1}'.format( job.state, job.message )
 
     return results
 
